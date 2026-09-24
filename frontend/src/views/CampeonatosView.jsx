@@ -26,17 +26,22 @@ export default function CampeonatosView() {
   const [form, setForm] = useState(emptyForm);
   const [editing, setEditing] = useState(null);
   const [deleting, setDeleting] = useState(null);
+  const [deleteError, setDeleteError] = useState('');
   const [busy, setBusy] = useState(false);
   const dialog = useRef(null);
   const deleteDialog = useRef(null);
+  const loadRequest = useRef(0);
 
   async function load() {
+    const request = ++loadRequest.current;
     setLoading(true); setError('');
-    try { setCampeonatos(listFrom((await api.get('/campeonatos')).data)); }
-    catch (err) { setError(messageFrom(err)); }
-    finally { setLoading(false); }
+    try {
+      const records = listFrom((await api.get('/campeonatos')).data);
+      if (request === loadRequest.current) setCampeonatos(records);
+    } catch (err) { if (request === loadRequest.current) setError(messageFrom(err)); }
+    finally { if (request === loadRequest.current) setLoading(false); }
   }
-  useEffect(() => { load(); }, [approvedRequests]);
+  useEffect(() => { load(); return () => { loadRequest.current++; }; }, [approvedRequests]);
   function openForm(record = null) {
     setEditing(record); setFormError(''); setMotivo('');
     setForm(record ? { ...emptyForm, ...Object.fromEntries(Object.keys(emptyForm).map(key => [key, record[key] ?? emptyForm[key]])) } : { ...emptyForm });
@@ -63,14 +68,22 @@ export default function CampeonatosView() {
     } catch (err) { setFormError(messageFrom(err)); }
     finally { setBusy(false); }
   }
+  function closeDelete() {
+    deleteDialog.current.close();
+    setDeleting(null); setDeleteError('');
+  }
   async function remove() {
-    if (!deleting) return;
-    setBusy(true); setFormError('');
+    if (!deleting || busy || !can('campeonatos:eliminar')) return;
+    const deletedId = recordId(deleting);
+    setBusy(true); setDeleteError('');
     try {
-      await api.delete('/campeonatos/' + recordId(deleting));
-      deleteDialog.current.close(); setDeleting(null);
-      setNotice('El campeonato se eliminó correctamente.'); await load();
-    } catch (err) { setFormError(messageFrom(err)); }
+      await api.delete('/campeonatos/' + deletedId);
+      loadRequest.current++;
+      setCampeonatos(current => current.filter(row => recordId(row) !== deletedId));
+      closeDelete();
+      setNotice('El campeonato y sus datos asociados se eliminaron. El historial de auditoría se conserva.');
+      await load();
+    } catch (err) { setDeleteError(messageFrom(err)); }
     finally { setBusy(false); }
   }
   const active = campeonatos.filter(c => c.activo === true).length;
@@ -94,7 +107,7 @@ export default function CampeonatosView() {
             <div><Icon name="calendar" size={18} /><div><dt>Duración por partido</dt><dd>{c.duracion_partido_min ?? '—'} min</dd></div></div>
           </dl>
         </div>
-        <div className="card-footer"><Link className="manage-link" to={'/campeonatos/' + recordId(c) + '/gestion'}>{can('campeonatos:editar') ? 'Administrar torneo' : 'Ver detalles'} <Icon name="arrow" size={17} /></Link><div className="card-tools">{can('auditoria:ver') && <Link className="icon-button" aria-label={'Historial de ' + c.nombre} title="Ver historial" to={'/historial?campeonato_id=' + recordId(c)}><Icon name="clock" size={18} /></Link>}{can('campeonatos:editar') && <button className="icon-button" title={'Editar ' + c.nombre} aria-label={'Editar ' + c.nombre} onClick={() => openForm(c)}><Icon name="edit" size={18} /></button>}{can('campeonatos:eliminar') && <button className="icon-button delete" title={'Eliminar ' + c.nombre} aria-label={'Eliminar ' + c.nombre} onClick={() => { setDeleting(c); setFormError(''); deleteDialog.current.showModal(); }}><Icon name="trash" size={18} /></button>}</div></div>
+        <div className="card-footer"><Link className="manage-link" to={'/campeonatos/' + recordId(c) + '/gestion'}>{can('campeonatos:editar') ? 'Administrar torneo' : 'Ver detalles'} <Icon name="arrow" size={17} /></Link><div className="card-tools">{can('auditoria:ver') && <Link className="icon-button" aria-label={'Historial de ' + c.nombre} title="Ver historial" to={'/historial?campeonato_id=' + recordId(c)}><Icon name="clock" size={18} /></Link>}{can('campeonatos:editar') && <button className="icon-button" title={'Editar ' + c.nombre} aria-label={'Editar ' + c.nombre} onClick={() => openForm(c)}><Icon name="edit" size={18} /></button>}{can('campeonatos:eliminar') && <button className="icon-button delete" title={'Eliminar ' + c.nombre} aria-label={'Eliminar ' + c.nombre} onClick={() => { setDeleting(c); setDeleteError(''); deleteDialog.current.showModal(); }}><Icon name="trash" size={18} /></button>}</div></div>
       </article>)}</div>}
     <dialog className="dialog" ref={dialog} aria-labelledby="championship-dialog-title" onCancel={event => { if (busy) event.preventDefault(); }}>
       <div className="dialog-header"><h2 id="championship-dialog-title">{editing ? 'Editar campeonato' : isMesa ? 'Solicitar campeonato' : 'Nuevo campeonato'}</h2><button className="icon-button" aria-label="Cerrar formulario" disabled={busy} onClick={() => dialog.current.close()}><Icon name="close" /></button></div>
@@ -111,8 +124,10 @@ export default function CampeonatosView() {
         {isMesa && !editing && <label className="field wide"><span>Mensaje para el administrador (opcional)</span><textarea maxLength={500} rows={3} value={motivo} onChange={event => setMotivo(event.target.value)} placeholder="Explica para qué necesitas crear este campeonato." /></label>}
       </div></div><div className="dialog-footer"><button className="button" type="button" disabled={busy} onClick={() => dialog.current.close()}>Cancelar</button><button className="button primary" type="submit" disabled={busy}>{busy ? 'Enviando…' : editing ? 'Guardar cambios' : isMesa ? 'Enviar solicitud' : 'Crear campeonato'}</button></div></form>
     </dialog>
-    <dialog className="dialog" ref={deleteDialog} aria-labelledby="delete-dialog-title" onCancel={event => { if (busy) event.preventDefault(); }}>
-      <div className="dialog-header"><h2 id="delete-dialog-title">Eliminar campeonato</h2><button className="icon-button" aria-label="Cancelar eliminación" disabled={busy} onClick={() => deleteDialog.current.close()}><Icon name="close" /></button></div><div className="dialog-body">{formError && <div className="alert" role="alert">{formError}</div>}<p>¿Quieres eliminar <strong>{deleting?.nombre}</strong>? Esta acción no se puede deshacer.</p></div><div className="dialog-footer"><button className="button" autoFocus disabled={busy} onClick={() => deleteDialog.current.close()}>Cancelar</button><button className="button danger" disabled={busy} onClick={remove}>{busy ? 'Eliminando…' : 'Eliminar campeonato'}</button></div>
+    <dialog className="dialog" ref={deleteDialog} aria-labelledby="delete-dialog-title" aria-describedby="delete-dialog-description" onCancel={event => { if (busy) event.preventDefault(); else { setDeleting(null); setDeleteError(''); } }}>
+      <div className="dialog-header"><h2 id="delete-dialog-title">Eliminar campeonato</h2><button className="icon-button" aria-label="Cancelar eliminación" disabled={busy} onClick={closeDelete}><Icon name="close" /></button></div>
+      <div className="dialog-body">{deleteError && <div className="alert" role="alert">{deleteError}</div>}<p id="delete-dialog-description">¿Quieres eliminar <strong>{deleting?.nombre}</strong> y todos sus datos asociados?</p><p>Se eliminarán sus equipos, jugadores, partidos, resultados, asistencias, sanciones y programación de fechas. El historial de auditoría se conservará.</p><p>Esta acción no se puede deshacer.</p></div>
+      <div className="dialog-footer"><button className="button" autoFocus disabled={busy} onClick={closeDelete}>Cancelar</button><button className="button danger" disabled={busy || !deleting} onClick={remove}>{busy ? 'Eliminando…' : 'Eliminar campeonato y datos'}</button></div>
     </dialog>
   </>;
 }

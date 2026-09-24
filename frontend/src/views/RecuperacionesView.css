@@ -1,0 +1,7 @@
+.recovery-timezone { display: flex; align-items: center; gap: 9px; color: var(--muted); font-size: .875rem; margin-bottom: 24px; }
+.recovery-timezone svg { flex-shrink: 0; }
+.recovery-request-card .request-person small { margin: 0 0 5px; }
+.recovery-request-data .recovery-request-timestamp dd { color: var(--accent-dark); font-size: 1.15rem; font-variant-numeric: tabular-nums; }
+.recovery-request-data .recovery-request-ip { grid-column: span 2; min-width: 0; }
+.recovery-request-ip dd, .recovery-ip-detail strong { overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.recovery-request-card .request-resolution time { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }

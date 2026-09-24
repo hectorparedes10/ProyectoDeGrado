@@ -40,9 +40,7 @@ function user(data, editing = false) {
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(result.email)) throw httpError(400, 'El correo electrónico no es válido.');
   if (!['admin','mesa','arbitro'].includes(result.rol) || typeof result.activo !== 'boolean') throw httpError(400, 'Selecciona un rol y estado válidos.');
   result.telefono = text(data.telefono ?? '', 'El teléfono', 30, false) || null;
-  result.email_recuperacion = text(data.email_recuperacion ?? '', 'El correo de recuperación', 150, false).toLowerCase() || null;
   if (result.telefono && (!/^\+?[\d\s()-]+$/.test(result.telefono) || result.telefono.replace(/\D/g,'').length<7 || result.telefono.replace(/\D/g,'').length>15)) throw httpError(400, 'El teléfono debe contener entre 7 y 15 dígitos; puedes incluir el código de país.');
-  if (result.email_recuperacion && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(result.email_recuperacion)) throw httpError(400, 'El correo de recuperación no es válido.');
   if (!editing || data.password) {
     result.password = password(data.password);
   }

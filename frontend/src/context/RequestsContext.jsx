@@ -33,7 +33,9 @@ export function RequestsProvider({ children }) {
   const requests = state.owner===owner ? state.requests : [];
   const recoveryRequests = state.owner===owner ? state.recoveryRequests : [];
   const error = state.owner===owner ? state.error : '';
-  const pendingCount = [...requests, ...recoveryRequests].filter(item => item.estado==='pendiente').length;
-  return <RequestsContext.Provider value={{ requests, recoveryRequests, loading, error, refresh, pendingCount }}>{children}</RequestsContext.Provider>;
+  const championshipPendingCount = requests.filter(item => item.estado==='pendiente').length;
+  const recoveryPendingCount = recoveryRequests.filter(item => item.estado==='pendiente').length;
+  const pendingCount = championshipPendingCount + recoveryPendingCount;
+  return <RequestsContext.Provider value={{ requests, recoveryRequests, loading, error, refresh, pendingCount, championshipPendingCount, recoveryPendingCount }}>{children}</RequestsContext.Provider>;
 }
 export function useRequests() { return useContext(RequestsContext); }

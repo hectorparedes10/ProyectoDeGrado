@@ -6,6 +6,7 @@ import CampeonatosView from './views/CampeonatosView';
 import GestionCampeonato from './views/GestionCampeonato';
 import UsuariosView from './views/UsuariosView';
 import SolicitudesView from './views/SolicitudesView';
+import RecuperacionesView from './views/RecuperacionesView';
 import HistorialView from './views/HistorialView';
 import Login from './views/Login';
 import { ForgotPassword, ChangePassword } from './views/PasswordRecovery';
@@ -33,6 +34,9 @@ export default function App() {
         <Route path="/campeonatos/:id/gestion" element={<GestionCampeonato />} />
         <Route element={<PermissionRoute permission="usuarios:gestionar" />}>
           <Route path="/usuarios" element={<UsuariosView />} />
+        </Route>
+        <Route element={<PermissionRoute permission="solicitudes:resolver" />}>
+          <Route path="/recuperaciones" element={<RecuperacionesView />} />
         </Route>
         <Route element={<PermissionRoute permission="auditoria:ver" />}>
           <Route path="/historial" element={<HistorialView />} />

@@ -18,9 +18,9 @@ test('Recuperación con aprobación, clave temporal y cambio obligatorio', { tim
   const temporary = '12345678';
   const app = createApp(pool);
   let server, adminToken, passwordHash, serial = 0;
-  async function call(method, path, body, token, instance = server) {
+  async function call(method, path, body, token, instance = server, headers = {}) {
     const response = await fetch('http://127.0.0.1:' + instance.address().port + '/api' + path, {
-      method, headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: 'Bearer ' + token } : {}) },
+      method, headers: { ...headers, 'Content-Type': 'application/json', ...(token ? { Authorization: 'Bearer ' + token } : {}) },
       body: body === undefined ? undefined : JSON.stringify(body), signal: AbortSignal.timeout(10000),
     });
     return { status: response.status, data: await response.json(), cache: response.headers.get('cache-control') };
@@ -33,8 +33,8 @@ test('Recuperación con aprobación, clave temporal y cambio obligatorio', { tim
   const stored = async account => (await pool.query('SELECT * FROM usuarios_sistema WHERE id=$1',[account.id])).rows[0];
   const change = (token, data = {}) => call('POST','/auth/change-password',{password:nextPassword,confirmPassword:nextPassword,...data},token);
   const decide = (id, decision = 'aprobar', token = adminToken) => call('PATCH','/solicitudes-recuperacion/'+id,{decision,respuesta:'Revisado en persona'},token);
-  async function request(account, data = {}) {
-    const result = await call('POST','/auth/forgot-password',{usuario:account.email,...data});
+  async function request(account, data = {}, headers = {}) {
+    const result = await call('POST','/auth/forgot-password',{usuario:account.email,...data},undefined,server,headers);
     assert.equal(result.status,202);
     return (await pool.query("SELECT * FROM solicitudes_recuperacion WHERE usuario_id=$1 AND estado='pendiente'",[account.id])).rows[0];
   }
@@ -75,13 +75,55 @@ test('Recuperación con aprobación, clave temporal y cambio obligatorio', { tim
     });
     await t.test('Deduplica pendientes, normaliza el usuario y descarta identidad/estado manipulados', async () => {
       const account = await user();
-      const entry = await request(account,{usuario:'  '+account.email.toUpperCase()+'  ',usuario_id:admin.id,estado:'aprobada',nombre:'Falso'});
+      const entry = await request(account,{usuario:'  '+account.email.toUpperCase()+'  ',usuario_id:admin.id,estado:'aprobada',nombre:'Falso',created_at:'2000-01-01T00:00:00.000Z',ip_origen:'203.0.113.99',ip:'203.0.113.99'});
       const again = await request(account);
+      assert.notEqual(entry.created_at.toISOString(),'2000-01-01T00:00:00.000Z');
       assert.equal(entry.id,again.id); assert.equal(entry.usuario_id,account.id); assert.equal(entry.email_usuario,account.email); assert.equal(entry.estado,'pendiente');
       const list = await call('GET','/solicitudes-recuperacion',undefined,adminToken);
       assert.equal(list.status,200);
-      assert.equal(list.data.find(item=>item.id===entry.id).solicitante_nombre,account.nombre);
+      const listed=list.data.find(item=>item.id===entry.id);
+      assert.equal(listed.solicitante_nombre,account.nombre);
+      assert.equal(listed.created_at,entry.created_at.toISOString());
+      assert.equal(listed.resuelta_at,null);
+      assert.equal(entry.ip_origen,'127.0.0.1');
+      assert.equal(listed.ip_origen,entry.ip_origen);
       assert.ok(!JSON.stringify(list.data).includes(passwordHash));
+    });
+    await t.test('Guarda IPv4/IPv6 del proxy local y conserva el origen al reenviar y resolver', async () => {
+      const cases = [
+        ['198.51.100.24','198.51.100.24'],
+        ['::ffff:192.0.2.10','192.0.2.10'],
+        ['2001:db8:1234:5678:abcd:ef01:2345:6789','2001:db8:1234:5678:abcd:ef01:2345:6789'],
+        ['203.0.113.99, 198.51.100.26','198.51.100.26'],
+        ['direccion-invalida',null],
+      ];
+      for (const [forwarded, expected] of cases) {
+        const account = await user();
+        const entry = await request(account,{ip_origen:'203.0.113.99'}, {'X-Forwarded-For':forwarded});
+        assert.equal(entry.ip_origen,expected);
+        const again = await request(account,{}, {'X-Forwarded-For':'192.0.2.50'});
+        assert.equal(again.id,entry.id);
+        assert.equal(again.ip_origen,expected);
+        assert.equal(again.created_at.toISOString(),entry.created_at.toISOString());
+        const list = await call('GET','/solicitudes-recuperacion',undefined,adminToken);
+        assert.equal(list.data.find(item=>item.id===entry.id).ip_origen,expected);
+        const decision = expected?.includes(':') ? 'rechazar' : 'aprobar';
+        const resolved = await call('PATCH','/solicitudes-recuperacion/'+entry.id,{decision,ip_origen:'203.0.113.99'},adminToken,server,{'X-Forwarded-For':'198.51.100.200'});
+        assert.equal(resolved.status,200,resolved.data.error);
+        assert.equal(resolved.data.solicitud.ip_origen,expected);
+        const stored = (await pool.query('SELECT ip_origen,created_at FROM solicitudes_recuperacion WHERE id=$1',[entry.id])).rows[0];
+        assert.equal(stored.ip_origen,expected);
+        assert.equal(stored.created_at.toISOString(),entry.created_at.toISOString());
+      }
+    });
+    await t.test('Los registros antiguos sin IP siguen disponibles después de repetir la migración', async () => {
+      const account = await user();
+      const entry = (await pool.query('INSERT INTO solicitudes_recuperacion (usuario_id,email_usuario) VALUES ($1,$2) RETURNING *',[account.id,account.email])).rows[0];
+      await ensureAccessSchema(pool);
+      const listed = (await call('GET','/solicitudes-recuperacion',undefined,adminToken)).data.find(item=>item.id===entry.id);
+      assert.equal(listed.ip_origen,null);
+      assert.equal(listed.created_at,entry.created_at.toISOString());
+      assert.equal((await decide(entry.id,'rechazar')).status,200);
     });
     await t.test('Solo un administrador con sesión vigente puede consultar y resolver recuperaciones', async () => {
       const account = await user(); const entry = await request(account);
@@ -160,7 +202,7 @@ test('Recuperación con aprobación, clave temporal y cambio obligatorio', { tim
       await approve(account); assert.equal((await login(account,temporary)).status,200);
     });
     await t.test('Cambiar credenciales, rol o estado cancela solicitudes anteriores sin reactivarlas', async () => {
-      const cases = [['PUT','',{email:'changed@example.test'}],['PUT','',{password:'Clave del admin 98!'}],['PUT','',{rol:'arbitro'}],['PUT','',{email_recuperacion:'new@example.test'}],['PATCH','/estado',{activo:false}],['DELETE','',undefined]];
+      const cases = [['PUT','',{email:'changed@example.test'}],['PUT','',{password:'Clave del admin 98!'}],['PUT','',{rol:'arbitro'}],['PATCH','/estado',{activo:false}],['DELETE','',undefined]];
       for (const [method,suffix,data] of cases) {
         const account = await user(); const entry = await request(account);
         assert.equal((await call(method,'/usuarios/'+account.id+suffix,data,adminToken)).status,200);

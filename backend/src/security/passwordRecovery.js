@@ -1,8 +1,9 @@
 const { randomBytes } = require('node:crypto');
+const { isIP } = require('node:net');
 const { asyncRoute, transaction, digest, hashPassword, httpError, audit, publicUser, requirePermission } = require('./access');
 const validate = require('./validation');
 const TEMPORARY_PASSWORD = '12345678';
-const REQUEST_MESSAGE = 'Si la cuenta está activa, el administrador recibirá tu solicitud. Cuando la apruebe, inicia sesión con la contraseña temporal 12345678 para crear tu nueva contraseña.';
+const REQUEST_MESSAGE = 'Si la cuenta está activa, el administrador recibirá tu solicitud. Cuando la apruebe, inicia sesión con la contraseña temporal para crear tu nueva contraseña.';
 
 async function rateLimit(pool, entries) {
   const allowed = await transaction(pool, async client => {
@@ -21,6 +22,14 @@ async function invalidateRecovery(client, id) {
   await client.query(`UPDATE solicitudes_recuperacion SET estado='cancelada',respuesta='La cuenta fue actualizada. Solicita nuevamente la recuperación si todavía la necesitas.',resuelta_at=clock_timestamp() WHERE usuario_id=$1 AND estado='pendiente'`, [id]);
 }
 
+function requestIp(req) {
+  // Express resolves the connection through the configured trusted proxies only.
+  const address = req.ip;
+  if (typeof address !== 'string' || !isIP(address) || address.length > 45) return null;
+  if (/^::ffff:/i.test(address) && isIP(address.slice(7)) === 4) return address.slice(7);
+  return address;
+}
+
 function registerPublicRecovery(app, pool) {
   app.post('/api/auth/forgot-password', asyncRoute(async (req, res) => {
     const email = validate.text(req.body?.usuario ?? req.body?.email, 'El usuario (correo de acceso)', 150).toLowerCase();
@@ -29,7 +38,7 @@ function registerPublicRecovery(app, pool) {
     await transaction(pool, async client => {
       const { rows } = await client.query('SELECT id,email FROM usuarios_sistema WHERE lower(email)=$1 AND activo=true AND eliminado_at IS NULL FOR UPDATE', [email]);
       if (!rows[0]) return;
-      await client.query(`INSERT INTO solicitudes_recuperacion (usuario_id,email_usuario) VALUES ($1,$2) ON CONFLICT (usuario_id) WHERE estado='pendiente' DO NOTHING`, [rows[0].id, rows[0].email]);
+      await client.query(`INSERT INTO solicitudes_recuperacion (usuario_id,email_usuario,ip_origen) VALUES ($1,$2,$3) ON CONFLICT (usuario_id) WHERE estado='pendiente' DO NOTHING`, [rows[0].id, rows[0].email, requestIp(req)]);
     });
     res.status(202).json({ message: REQUEST_MESSAGE });
   }));

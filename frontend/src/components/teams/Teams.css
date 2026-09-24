@@ -1,0 +1,92 @@
+.teams-section, .team-roster { min-width: 0; }
+.teams-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin: 0 0 23px; }
+.teams-toolbar h2 { margin: 0 0 6px; }
+.teams-toolbar h2 .badge { margin-left: 7px; vertical-align: middle; }
+.teams-toolbar p { margin: 0; color: var(--muted); font-size: .85rem; }
+.teams-toolbar-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; flex-shrink: 0; }
+.teams-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr)); gap: 18px; }
+.team-card { display: flex; flex-direction: column; justify-content: space-between; gap: 21px; min-height: 152px; padding: 19px; border: 1px solid var(--line); border-radius: 12px; text-align: left; background: #fff; color: var(--ink); box-shadow: 0 2px 4px #193c4b05; transition: border-color .15s, box-shadow .15s; }
+.team-card:hover { border-color: #8abbb1; box-shadow: 0 5px 15px #193c4b0c; }
+.team-card-heading { display: flex; align-items: center; gap: 13px; }
+.team-card-title { min-width: 0; }
+.team-card-title strong { display: block; font-size: 1rem; font-weight: 700; line-height: 1.35; overflow-wrap: anywhere; }
+.team-card-title small { display: block; margin-top: 6px; color: var(--muted); font-size: .8rem; overflow-wrap: anywhere; }
+.team-emblem { width: 56px; height: 62px; display: inline-flex; align-items: center; justify-content: center; border-radius: 12px; border: 1px solid #dbe9e6; background: #f0f7f5; color: #478173; flex-shrink: 0; overflow: hidden; font-size: 1rem; font-weight: 700; letter-spacing: .04em; }
+.team-emblem img { width: 100%; height: 100%; padding: 6px; object-fit: contain; background: white; }
+.team-card-footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 9px; border-top: 1px solid #edf1f4; padding-top: 14px; font-size: .75rem; }
+.team-card-footer > span { display: inline-flex; gap: 6px; align-items: center; }
+.team-card-footer > span:first-child { color: var(--muted); }
+.team-card-footer > span:last-child { color: var(--accent); font-weight: 600; }
+.roster-team-header { display: flex; align-items: center; flex-wrap: wrap; gap: 18px; margin: 10px 0 29px; }
+.roster-team-header > .team-emblem { width: 70px; height: 76px; font-size: 1.2rem; }
+.roster-team-summary { flex: 1; min-width: 140px; }
+.roster-team-summary h2 { margin: 5px 0 5px; overflow-wrap: anywhere; }
+.roster-team-summary p { margin: 0; font-size: .875rem; color: var(--muted); overflow-wrap: anywhere; }
+.roster-team-contact { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; width: 100%; margin: 1px 0 0; padding-top: 18px; border-top: 1px solid var(--line); }
+.roster-team-contact dt, .player-profile-data dt { color: var(--muted); font-size: .75rem; margin-bottom: 6px; }
+.roster-team-contact dd, .player-profile-data dd { margin: 0; font-size: .875rem; font-weight: 600; overflow-wrap: anywhere; }
+.roster-list-panel { padding: 0; overflow: hidden; }
+.roster-table th, .roster-table td { padding: 13px 16px; }
+.roster-table td:nth-child(3) { min-width: 100px; }
+.roster-table td:nth-child(4), .roster-table td:nth-child(5) { text-align: center; }
+.roster-table th:nth-child(4), .roster-table th:nth-child(5) { text-align: center; }
+.player-dorsal { display: inline-grid; place-items: center; min-width: 36px; height: 38px; padding: 0 7px; border-radius: 8px; background: #f0f5f6; font-weight: 700; font-size: 1rem; font-variant-numeric: tabular-nums; }
+.player-name-button { display: flex; align-items: center; gap: 11px; padding: 4px 0; min-width: 190px; max-width: 350px; border: 0; background: transparent; color: var(--ink); text-align: left; }
+.player-name-button strong { font-weight: 600; line-height: 1.5; overflow-wrap: anywhere; }
+.player-name-button:hover strong { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
+.player-portrait { width: 68px; height: 80px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; border-radius: 10px; background: #eaf0f4; border: 1px solid #dde6ed; color: #657c8e; overflow: hidden; font-weight: 700; font-size: 1.1rem; }
+.player-portrait img { width: 100%; height: 100%; object-fit: cover; }
+.player-name-button .player-portrait { width: 36px; height: 42px; border-radius: 7px; font-size: .75rem; }
+.player-stat-number { font-variant-numeric: tabular-nums; font-weight: 600; }
+.player-cards { display: inline-flex; align-items: center; gap: 13px; }
+.player-cards > span { display: inline-flex; align-items: center; gap: 5px; font-variant-numeric: tabular-nums; }
+.player-yellow-card, .player-red-card { display: inline-block; width: 10px; height: 14px; border-radius: 2px; background: #eabd41; border: 1px solid #bf952a; flex-shrink: 0; }
+.player-red-card { background: #d9585c; border-color: #b13b42; }
+.roster-stats-caption { margin: 0; padding: 13px 17px; border-top: 1px solid var(--line); color: var(--muted); font-size: .75rem; background: #fbfcfd; }
+.roster-dialog .roster-form-fields { margin: 0; padding: 0; border: 0; min-width: 0; }
+.roster-form-team { font-size: .875rem; color: var(--muted); margin-bottom: 20px; overflow-wrap: anywhere; }
+.roster-form-team strong { color: var(--ink); }
+.team-image-upload { display: flex; align-items: center; gap: 19px; padding-bottom: 23px; margin-bottom: 23px; border-bottom: 1px solid var(--line); }
+.team-image-upload > .team-emblem { width: 76px; height: 84px; }
+.team-image-upload > .player-portrait { width: 76px; height: 92px; }
+.team-image-controls { min-width: 0; }
+.team-image-controls > strong { display: block; font-size: .875rem; margin-bottom: 10px; }
+.team-image-controls > strong span { color: var(--muted); font-size: .8rem; font-weight: 400; }
+.team-upload-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 6px; }
+.team-upload-actions .button { min-height: 39px; padding: 8px 11px; font-size: .8rem; }
+.team-image-controls > p { margin: 8px 0 0; }
+.team-image-error { color: #a03743; font-size: .8rem; line-height: 1.5; }
+.player-profile-dialog { width: min(430px, calc(100% - 32px)); }
+.player-profile-body { text-align: center; }
+.player-profile-body > .player-portrait { width: 94px; height: 112px; margin: 0 auto 16px; font-size: 1.5rem; }
+.player-profile-body h3 { margin: 0 0 23px; font-size: 1.25rem; overflow-wrap: anywhere; }
+.player-profile-data { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; margin: 0; text-align: left; padding-top: 20px; border-top: 1px solid var(--line); }
+.player-profile-data .wide { grid-column: 1 / -1; }
+.player-profile-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin: 23px 0 0; padding: 17px 9px; border: 1px solid #dce8e5; border-radius: 10px; background: #f4f9f7; }
+.player-profile-stats dt { font-size: .67rem; color: var(--muted); margin-bottom: 7px; }
+.player-profile-stats dd { margin: 0; font-size: 1.15rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.player-profile-stats + p { margin: 9px 0 0; font-size: .72rem; color: var(--muted); }
+@media (max-width: 1100px) { .teams-toolbar { align-items: flex-start; flex-wrap: wrap; } }
+@media (max-width: 540px) {
+  .teams-toolbar-actions { width: 100%; flex-shrink: 1; }
+  .teams-toolbar-actions > .button.primary { flex: 1; }
+  .roster-team-header { gap: 14px; }
+  .roster-team-header > .button { width: 100%; }
+  .roster-team-contact { gap: 17px; }
+  .team-image-upload { align-items: flex-start; gap: 13px; }
+  .team-image-upload > .team-emblem { width: 62px; height: 70px; }
+  .team-image-upload > .player-portrait { width: 62px; height: 76px; }
+  .team-upload-actions { gap: 6px; }
+  .roster-table th, .roster-table td { padding: 12px; }
+}.roster-team-actions, .roster-player-actions { display: flex; align-items: center; gap: 8px; }
+.roster-team-actions { flex-wrap: wrap; }
+.roster-player-actions .icon-button.danger { color: #a93642; }
+.roster-player-actions .icon-button.danger:hover { background: #fff0f1; }
+.roster-form-required { margin: -8px 0 20px; color: var(--muted); font-size: .8rem; }
+.roster-delete-body p { line-height: 1.6; overflow-wrap: anywhere; }
+.roster-delete-body p + p { color: var(--muted); font-size: .875rem; }
+.player-retired-note { margin: 14px 0 0; color: var(--muted); font-size: .78rem; line-height: 1.5; }
+@media (max-width: 540px) {
+  .roster-team-actions { width: 100%; }
+  .roster-team-actions > .button { flex: 1; }
+}

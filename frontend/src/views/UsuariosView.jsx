@@ -5,7 +5,7 @@ import { initials, roleLabel } from '../components/layout/AppLayout';
 import Icon from '../components/ui/Icon';
 import api from '../services/api';
 
-const emptyForm = { nombre: '', email: '', telefono: '', email_recuperacion: '', password: '', rol: 'mesa', activo: true };
+const emptyForm = { nombre: '', email: '', telefono: '', password: '', rol: 'mesa', activo: true };
 const roleDescriptions = {
   admin: 'Gestiona usuarios, campeonatos, solicitudes y el historial de cambios.',
   mesa: 'Ve y edita campeonatos. Solicita aprobación para crear uno. No elimina ni accede a Usuarios.',
@@ -36,7 +36,7 @@ export default function UsuariosView() {
   useEffect(() => { load(); }, []);
   function open(record = null) {
     setEditing(record); setFormError('');
-    setForm(record ? { nombre: record.nombre, email: record.email, telefono: record.telefono || '', email_recuperacion: record.email_recuperacion || '', rol: record.role, activo: record.activo, password: '' } : { ...emptyForm });
+    setForm(record ? { nombre: record.nombre, email: record.email, telefono: record.telefono || '', rol: record.role, activo: record.activo, password: '' } : { ...emptyForm });
     dialog.current.showModal();
   }
   function change(event) {
@@ -91,7 +91,7 @@ export default function UsuariosView() {
     <div className="panel users-panel"><div className="table-wrap"><table><thead><tr><th>USUARIO</th><th>CONTACTO</th><th>ROL</th><th>ESTADO</th><th>ACCIONES</th></tr></thead><tbody>
       {loading ? <tr><td colSpan="5" className="table-empty" role="status">Cargando usuarios…</td></tr> : users.map(item => <tr key={item.id}>
         <td><div className="table-name"><span className="avatar">{initials(item.nombre)}</span><div><strong>{item.nombre}</strong>{item.id===user.id && <small className="muted-text">Tu cuenta</small>}{item.requiresPasswordChange && <small className="muted-text">Debe cambiar su contraseña</small>}</div></div></td>
-        <td className="contact-cell"><span>{item.email}</span><small>Tel.: {item.telefono || 'Sin registrar'}</small><small>Recuperación: {item.email_recuperacion || 'Sin registrar'}</small></td>
+        <td className="contact-cell"><span>{item.email}</span><small>Tel.: {item.telefono || 'Sin registrar'}</small></td>
         <td>{roleLabel(item.role)}</td>
         <td><button type="button" className={'badge state-button' + (item.activo ? '' : ' inactive')} role="switch" aria-checked={item.activo} aria-label={'Acceso de ' + item.nombre} disabled={item.id===user.id || changingId!==null} onClick={() => toggleState(item)} title={item.id===user.id ? 'No puedes desactivar tu propia cuenta' : 'Cambiar estado'}>{changingId===item.id ? 'Guardando…' : item.activo ? 'Activo' : 'Inactivo'}<span aria-hidden="true">⇄</span></button></td>
         <td><div className="card-tools"><button className="icon-button" onClick={() => open(item)} aria-label={'Editar usuario ' + item.nombre} title="Editar usuario"><Icon name="edit" size={18} /></button><button className="icon-button delete" disabled={item.id===user.id} onClick={() => { setDeleting(item); setFormError(''); deleteDialog.current.showModal(); }} aria-label={'Eliminar usuario ' + item.nombre} title={item.id===user.id ? 'No puedes eliminar tu propia cuenta' : 'Eliminar usuario'}><Icon name="trash" size={18} /></button></div></td>
@@ -103,8 +103,8 @@ export default function UsuariosView() {
       <form onSubmit={submit}><div className="dialog-body">{formError && <div className="alert" role="alert">{formError}</div>}<div className="form-grid">
         <label className="field wide"><span>Nombre completo</span><input name="nombre" required autoFocus maxLength={100} autoComplete="off" value={form.nombre} onChange={change} placeholder="Nombre y apellido" /></label>
         <label className="field wide"><span>Correo de acceso</span><input name="email" required type="email" maxLength={150} autoComplete="off" value={form.email} onChange={change} placeholder="usuario@correo.com" /></label>
-        <label className="field"><span>Teléfono (opcional)</span><input name="telefono" type="tel" maxLength={30} autoComplete="off" value={form.telefono} onChange={change} placeholder="+591 70000000" /></label>
-        <label className="field"><span>Correo de recuperación (opcional)</span><input name="email_recuperacion" type="email" maxLength={150} autoComplete="off" value={form.email_recuperacion} onChange={change} placeholder="correo.alternativo@ejemplo.com" /></label>
+        <label className="field wide"><span>Teléfono (opcional)</span><input name="telefono" type="tel" maxLength={30} autoComplete="off" value={form.telefono} onChange={change} placeholder="+591 70000000" /></label>
+
         <label className="field wide"><span>{editing ? 'Nueva contraseña (opcional)' : 'Contraseña'}</span><input name="password" type="password" required={!editing} minLength={8} maxLength={128} autoComplete="new-password" value={form.password} onChange={change} placeholder={editing ? 'Deja vacío para mantener la actual' : 'Al menos 8 caracteres'} /></label>
         <label className="field wide"><span>Rol de acceso</span><select name="rol" value={form.rol} onChange={change} disabled={editing?.id===user.id}><option value="admin">Administrador</option><option value="mesa">Mesa de control</option><option value="arbitro">Árbitro</option></select><small className="field-help">{roleDescriptions[form.rol]}</small></label>
         <label className="checkbox-field"><input name="activo" type="checkbox" checked={form.activo} onChange={change} disabled={editing?.id===user.id} />Usuario activo</label>

@@ -1,10 +1,15 @@
+const { ensureRosterSchema } = require('./rosterSchema');
+const { ensureMatchSchema } = require('../services/matchSchema');
+const { purgePreviouslyDeletedSports } = require('../services/sportsDeletion');
+
 async function ensureAccessSchema(pool) {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
+    await client.query('SELECT pg_advisory_xact_lock(91840621)');
     await client.query(`
       ALTER TABLE usuarios_sistema ADD COLUMN IF NOT EXISTS telefono VARCHAR(30);
-      ALTER TABLE usuarios_sistema ADD COLUMN IF NOT EXISTS email_recuperacion VARCHAR(150);
+
       ALTER TABLE usuarios_sistema ADD COLUMN IF NOT EXISTS eliminado_at TIMESTAMPTZ;
       ALTER TABLE usuarios_sistema ADD COLUMN IF NOT EXISTS debe_cambiar_password BOOLEAN NOT NULL DEFAULT false;
       ALTER TABLE usuarios_sistema ADD COLUMN IF NOT EXISTS password_temporal_expira_at TIMESTAMPTZ;
@@ -41,6 +46,7 @@ async function ensureAccessSchema(pool) {
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         resuelta_at TIMESTAMPTZ
       );
+      ALTER TABLE solicitudes_recuperacion ADD COLUMN IF NOT EXISTS ip_origen VARCHAR(45);
       CREATE UNIQUE INDEX IF NOT EXISTS solicitudes_recuperacion_pendiente_idx ON solicitudes_recuperacion(usuario_id) WHERE estado='pendiente';
       CREATE TABLE IF NOT EXISTS solicitudes_campeonato (
         id SERIAL PRIMARY KEY,
@@ -56,6 +62,10 @@ async function ensureAccessSchema(pool) {
       );
       CREATE UNIQUE INDEX IF NOT EXISTS solicitudes_campeonato_pendiente_idx ON solicitudes_campeonato(solicitante_id) WHERE estado='pendiente';
     `);
+    await client.query('ALTER TABLE campeonatos ADD COLUMN IF NOT EXISTS eliminado_at TIMESTAMPTZ');
+    await ensureRosterSchema(client);
+    await ensureMatchSchema(client);
+    await purgePreviouslyDeletedSports(client);
     await client.query('COMMIT');
   } catch (error) { await client.query('ROLLBACK'); throw error; }
   finally { client.release(); }

@@ -27,7 +27,7 @@ export function ForgotPassword() {
       <label className="field"><span>Usuario (correo de acceso)</span><input type="email" autoComplete="username" maxLength={150} value={email} onChange={event => setEmail(event.target.value)} placeholder="tu@correo.com" required disabled={busy} /></label>
       <button className="button primary" type="submit" disabled={busy}>{busy ? 'Enviando solicitud…' : 'Solicitar recuperación'}<Icon name="arrow" size={18} /></button>
     </form>}
-    <Link className="auth-back" to="/login" state={{ notice: sent ? 'Después de la aprobación, ingresa con tu usuario y la contraseña temporal 12345678.' : undefined }}><Icon name="back" size={18} />Volver a iniciar sesión</Link>
+    <Link className="auth-back" to="/login" state={{ notice: sent ? 'Después de la aprobación, ingresa con tu usuario y la contraseña temporal.' : undefined }}><Icon name="back" size={18} />Volver a iniciar sesión</Link>
   </AuthLayout>;
 }
 

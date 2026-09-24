@@ -3,13 +3,13 @@ const { promisify } = require('node:util');
 const scrypt = promisify(scryptCallback);
 
 const permissions = {
-  admin: ['campeonatos:ver', 'campeonatos:crear', 'campeonatos:editar', 'campeonatos:eliminar', 'usuarios:gestionar', 'solicitudes:resolver', 'auditoria:ver', 'partidos:registrar_jugadores', 'partidos:resultados', 'facial:verificar'],
-  mesa: ['campeonatos:ver', 'campeonatos:editar', 'campeonatos:solicitar', 'partidos:registrar_jugadores'],
+  admin: ['campeonatos:ver', 'campeonatos:crear', 'campeonatos:editar', 'campeonatos:eliminar', 'usuarios:gestionar', 'solicitudes:resolver', 'auditoria:ver', 'equipos:gestionar', 'equipos:eliminar', 'jugadores:gestionar', 'jugadores:eliminar', 'partidos:eliminar', 'partidos:registrar_jugadores', 'partidos:resultados', 'facial:verificar'],
+  mesa: ['campeonatos:ver', 'campeonatos:editar', 'campeonatos:solicitar', 'equipos:gestionar', 'jugadores:gestionar', 'partidos:registrar_jugadores', 'partidos:resultados'],
   arbitro: ['campeonatos:ver', 'facial:verificar'],
 };
 
 function publicUser(row) {
-  return { id: row.id, nombre: row.nombre, email: row.email, telefono: row.telefono ?? null, email_recuperacion: row.email_recuperacion ?? null, role: row.rol, rol: row.rol, activo: row.activo, requiresPasswordChange: Boolean(row.debe_cambiar_password || row.solo_cambio_password), permissions: row.debe_cambiar_password || row.solo_cambio_password ? [] : permissions[row.rol] || [] };
+  return { id: row.id, nombre: row.nombre, email: row.email, telefono: row.telefono ?? null, role: row.rol, rol: row.rol, activo: row.activo, requiresPasswordChange: Boolean(row.debe_cambiar_password || row.solo_cambio_password), permissions: row.debe_cambiar_password || row.solo_cambio_password ? [] : permissions[row.rol] || [] };
 }
 function digest(token) { return createHash('sha256').update(token).digest('hex'); }
 function safeEqual(a, b) {

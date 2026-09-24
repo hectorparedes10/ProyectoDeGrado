@@ -18,8 +18,10 @@ export default function AppLayout() {
   const navigate = useNavigate();
   const drawer = useRef(null);
   const { user, can, logout: endSession } = useAuth();
-  const { pendingCount, error: notificationError } = useRequests();
-  const section = location.pathname.startsWith('/usuarios') ? 'Usuarios' : location.pathname.startsWith('/solicitudes') ? 'Solicitudes' : location.pathname.startsWith('/historial') ? 'Historial' : 'Campeonatos';
+  const { pendingCount, championshipPendingCount, recoveryPendingCount, error: notificationError } = useRequests();
+  const notificationPath = recoveryPendingCount > 0 ? '/recuperaciones' : '/solicitudes';
+  const notificationLabel = recoveryPendingCount + ' recuperaciones de acceso y ' + championshipPendingCount + ' solicitudes de campeonatos pendientes';
+  const section = location.pathname.startsWith('/usuarios') ? 'Usuarios' : location.pathname.startsWith('/recuperaciones') ? 'Recuperación de acceso' : location.pathname.startsWith('/solicitudes') ? 'Solicitudes' : location.pathname.startsWith('/historial') ? 'Historial' : 'Campeonatos';
   useEffect(() => {
     drawer.current?.close();
     document.title = section + ' · ARENA FUTSAL SYSTEM';
@@ -35,7 +37,8 @@ export default function AppLayout() {
       <nav className="sidebar-nav" aria-label="Navegación principal">
         <NavLink to="/campeonatos" className={({ isActive }) => 'nav-item' + (isActive ? ' active' : '')}><Icon name="trophy" /><span>Campeonatos</span><Icon name="arrow" size={16} /></NavLink>
         {can('usuarios:gestionar') && <NavLink to="/usuarios" className={({ isActive }) => 'nav-item' + (isActive ? ' active' : '')}><Icon name="users" /><span>Usuarios</span><Icon name="arrow" size={16} /></NavLink>}
-        {['admin','mesa'].includes(user.role) && <NavLink to="/solicitudes" className={({ isActive }) => 'nav-item' + (isActive ? ' active' : '')}><Icon name="bell" /><span>{user.role==='admin' ? 'Solicitudes' : 'Mis solicitudes'}</span>{pendingCount>0 && <b className="nav-count">{pendingCount}</b>}</NavLink>}
+        {['admin','mesa'].includes(user.role) && <NavLink to="/solicitudes" className={({ isActive }) => 'nav-item' + (isActive ? ' active' : '')}><Icon name="bell" /><span>{user.role==='admin' ? 'Solicitudes' : 'Mis solicitudes'}</span>{championshipPendingCount>0 && <b className="nav-count">{championshipPendingCount}</b>}</NavLink>}
+        {can('solicitudes:resolver') && <NavLink to="/recuperaciones" className={({ isActive }) => 'nav-item' + (isActive ? ' active' : '')}><Icon name="lock" /><span>Recuperación de acceso</span>{recoveryPendingCount>0 && <b className="nav-count">{recoveryPendingCount}</b>}</NavLink>}
         {can('auditoria:ver') && <NavLink to="/historial" className={({ isActive }) => 'nav-item' + (isActive ? ' active' : '')}><Icon name="clock" /><span>Historial de cambios</span><Icon name="arrow" size={16} /></NavLink>}
       </nav>
       <div className="sidebar-bottom">
@@ -50,7 +53,7 @@ export default function AppLayout() {
     <aside className="desktop-sidebar">{sidebar()}</aside>
     <dialog ref={drawer} className="mobile-drawer" aria-label="Menú principal" onClick={event => { if (event.target === event.currentTarget) drawer.current.close(); }}><div className="drawer-content">{sidebar(true)}</div></dialog>
     <div className="main-shell">
-      <header className="topbar"><div className="topbar-left"><button className="icon-button mobile-menu" aria-label="Abrir menú" onClick={() => drawer.current.showModal()}><Icon name="menu" /></button><span className="breadcrumb">Administración <span>/</span> <strong>{section}</strong></span></div><div className="topbar-account">{can('solicitudes:resolver') && <Link className="icon-button notification-button" to="/solicitudes" aria-label={notificationError ? 'No se pudieron actualizar las notificaciones' : pendingCount + ' solicitudes pendientes'} title={notificationError || 'Solicitudes de campeonatos y recuperación de acceso'}><Icon name="bell" />{pendingCount>0 && <span className="notification-count">{pendingCount}</span>}{notificationError && <span className="notification-count">!</span>}</Link>}<span className="account-name">{user?.nombre || 'ARENA FUTSAL SYSTEM'}</span><span className="avatar small">{initials(user?.nombre)}</span></div></header>
+      <header className="topbar"><div className="topbar-left"><button className="icon-button mobile-menu" aria-label="Abrir menú" onClick={() => drawer.current.showModal()}><Icon name="menu" /></button><span className="breadcrumb">Administración <span>/</span> <strong>{section}</strong></span></div><div className="topbar-account">{can('solicitudes:resolver') && <Link className="icon-button notification-button" to={notificationPath} aria-label={notificationError ? 'No se pudieron actualizar las notificaciones' : notificationLabel} title={notificationError || notificationLabel}><Icon name="bell" />{pendingCount>0 && <span className="notification-count">{pendingCount}</span>}{notificationError && <span className="notification-count">!</span>}</Link>}<span className="account-name">{user?.nombre || 'ARENA FUTSAL SYSTEM'}</span><span className="avatar small">{initials(user?.nombre)}</span></div></header>
       <main id="contenido" className="page-content"><Outlet /></main>
       <footer className="page-footer"><span>ARENA FUTSAL SYSTEM</span><span>Gestión deportiva</span></footer>
     </div>

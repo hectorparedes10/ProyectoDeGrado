@@ -5,6 +5,10 @@ const { publicUser, hashPassword, verifyPassword, digest, httpError, asyncRoute,
 const validate = require('./security/validation');
 const { registerPublicRecovery, registerPrivateRecovery, invalidateRecovery } = require('./security/passwordRecovery');
 const { createChampionship, updateChampionship } = require('./services/championshipPersistence');
+const { registerRosterRoutes } = require('./services/rosterRoutes');
+const { deleteChampionship } = require('./services/sportsDeletion');
+const { registerMatchRoutes } = require('./services/matchRoutes');
+const { registerFixtureRoutes } = require('./services/fixtureRoutes');
 
 function createApp(pool) {
   const app = express();
@@ -12,7 +16,13 @@ function createApp(pool) {
   // Only the proxy running on this machine may supply client IP headers.
   app.set('trust proxy', 'loopback');
   app.use(cors());
-  app.use(express.json({ limit: '100kb' }));
+  const standardJson = express.json({ limit: '100kb' });
+  const imageJson = express.json({ limit: '1.5mb' });
+  app.use((req, res, next) => {
+    const imageWrite = (req.method === 'POST' && /^\/api\/(?:campeonatos\/[^/]+\/equipos|equipos\/[^/]+\/jugadores)\/?$/.test(req.path))
+      || (req.method === 'PUT' && /^\/api\/(?:equipos|jugadores)\/[^/]+\/?$/.test(req.path));
+    return (imageWrite ? imageJson : standardJson)(req, res, next);
+  });
   app.use('/api', (req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
   const route = asyncRoute;
   const allow = requirePermission;
@@ -74,16 +84,19 @@ function createApp(pool) {
     if (req.user.role === 'arbitro' && !['GET','HEAD'].includes(req.method)) return next(httpError(403, 'El árbitro no puede modificar partidos ni resultados.'));
     next();
   });
+  registerRosterRoutes(app, pool, write);
+  registerMatchRoutes(app, pool, write);
+  registerFixtureRoutes(app, pool, write);
 
   app.get('/api/usuarios', allow('usuarios:gestionar'), route(async (req, res) => {
-    const { rows } = await pool.query('SELECT id,nombre,email,telefono,email_recuperacion,rol,activo,debe_cambiar_password,created_at FROM usuarios_sistema WHERE eliminado_at IS NULL ORDER BY id');
+    const { rows } = await pool.query('SELECT id,nombre,email,telefono,rol,activo,debe_cambiar_password,created_at FROM usuarios_sistema WHERE eliminado_at IS NULL ORDER BY id');
     res.json(rows.map(row => ({ ...publicUser(row), created_at: row.created_at })));
   }));
   app.post('/api/usuarios', allow('usuarios:gestionar'), route(async (req, res) => {
     const data = validate.user(req.body);
     const passwordHash = await hashPassword(data.password);
     const user = await write(req, 'usuarios:gestionar', async client => {
-      const { rows } = await client.query('INSERT INTO usuarios_sistema (nombre,email,password_hash,rol,activo,telefono,email_recuperacion) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id,nombre,email,rol,activo,telefono,email_recuperacion,debe_cambiar_password', [data.nombre,data.email,passwordHash,data.rol,data.activo,data.telefono,data.email_recuperacion]);
+      const { rows } = await client.query('INSERT INTO usuarios_sistema (nombre,email,password_hash,rol,activo,telefono) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id,nombre,email,rol,activo,telefono,debe_cambiar_password', [data.nombre,data.email,passwordHash,data.rol,data.activo,data.telefono]);
       await audit(client, req, 'usuario_creado', { usuario_id: rows[0].id, rol: data.rol }); return publicUser(rows[0]);
     });
     res.status(201).json(user);
@@ -93,7 +106,7 @@ function createApp(pool) {
     if (!req.body || typeof req.body!=='object' || Array.isArray(req.body)) throw httpError(400, 'Completa los datos del usuario.');
     const user = await write(req, 'usuarios:gestionar', async client => {
       // Lock in a consistent order to preserve at least one active administrator.
-      const { rows: users } = await client.query('SELECT id,nombre,email,telefono,email_recuperacion,rol,activo FROM usuarios_sistema WHERE eliminado_at IS NULL ORDER BY id FOR UPDATE');
+      const { rows: users } = await client.query('SELECT id,nombre,email,telefono,rol,activo FROM usuarios_sistema WHERE eliminado_at IS NULL ORDER BY id FOR UPDATE');
       const actor = users.find(item => item.id===req.user.id);
       if (!actor?.activo || actor.rol!=='admin') throw httpError(403, 'Ya no tienes permiso para administrar usuarios.');
       const existing = users.find(item => item.id===id);
@@ -102,9 +115,9 @@ function createApp(pool) {
       const passwordHash = data.password ? await hashPassword(data.password) : null;
       if (id===req.user.id && (!data.activo || data.rol!=='admin')) throw httpError(409, 'No puedes desactivar tu propia cuenta ni retirarte el rol administrador.');
       if (existing.rol==='admin' && existing.activo && (!data.activo || data.rol!=='admin') && users.filter(item => item.activo && item.rol==='admin').length<=1) throw httpError(409, 'Debe quedar al menos un administrador activo.');
-      const { rows } = await client.query('UPDATE usuarios_sistema SET nombre=$1,email=$2,rol=$3,activo=$4,password_hash=COALESCE($5,password_hash),telefono=$7,email_recuperacion=$8 WHERE id=$6 RETURNING id,nombre,email,rol,activo,telefono,email_recuperacion,debe_cambiar_password', [data.nombre,data.email,data.rol,data.activo,passwordHash,id,data.telefono,data.email_recuperacion]);
+      const { rows } = await client.query('UPDATE usuarios_sistema SET nombre=$1,email=$2,rol=$3,activo=$4,password_hash=COALESCE($5,password_hash),telefono=$7 WHERE id=$6 RETURNING id,nombre,email,rol,activo,telefono,debe_cambiar_password', [data.nombre,data.email,data.rol,data.activo,passwordHash,id,data.telefono]);
       if (passwordHash || existing.rol!==data.rol || existing.activo!==data.activo) await client.query('DELETE FROM sesiones_usuario WHERE usuario_id=$1', [id]);
-      if (passwordHash || existing.email!==data.email || existing.email_recuperacion!==data.email_recuperacion || existing.rol!==data.rol || existing.activo!==data.activo) {
+      if (passwordHash || existing.email!==data.email || existing.rol!==data.rol || existing.activo!==data.activo) {
         await invalidateRecovery(client, id);
         if (passwordHash) { await client.query('UPDATE usuarios_sistema SET debe_cambiar_password=false,password_temporal_expira_at=NULL WHERE id=$1', [id]); rows[0].debe_cambiar_password = false; }
         else await client.query('UPDATE usuarios_sistema SET password_temporal_expira_at=clock_timestamp() WHERE id=$1 AND debe_cambiar_password=true', [id]);
@@ -127,7 +140,7 @@ function createApp(pool) {
       const active = deleting ? false : req.body.activo;
       if (id===req.user.id && !active) throw httpError(409, 'No puedes desactivar ni eliminar tu propia cuenta.');
       if (target.rol==='admin' && target.activo && !active && users.filter(item => item.rol==='admin' && item.activo).length<=1) throw httpError(409, 'Debe quedar al menos un administrador activo.');
-      const { rows } = await client.query('UPDATE usuarios_sistema SET activo=$1,eliminado_at=CASE WHEN $2 THEN NOW() ELSE eliminado_at END WHERE id=$3 RETURNING id,nombre,email,rol,activo,telefono,email_recuperacion,debe_cambiar_password', [active,deleting,id]);
+      const { rows } = await client.query('UPDATE usuarios_sistema SET activo=$1,eliminado_at=CASE WHEN $2 THEN NOW() ELSE eliminado_at END WHERE id=$3 RETURNING id,nombre,email,rol,activo,telefono,debe_cambiar_password', [active,deleting,id]);
       if (!active) {
         await client.query('DELETE FROM sesiones_usuario WHERE usuario_id=$1', [id]);
         await invalidateRecovery(client, id);
@@ -143,10 +156,10 @@ function createApp(pool) {
   }));
 
   app.get('/api/campeonatos', allow('campeonatos:ver'), route(async (req, res) => {
-    res.json((await pool.query('SELECT * FROM campeonatos ORDER BY id_campeonato DESC')).rows);
+    res.json((await pool.query('SELECT * FROM campeonatos WHERE eliminado_at IS NULL ORDER BY id_campeonato DESC')).rows);
   }));
   app.get('/api/campeonatos/:id', allow('campeonatos:ver'), route(async (req, res) => {
-    const { rows } = await pool.query('SELECT * FROM campeonatos WHERE id_campeonato=$1', [validate.id(req.params.id)]);
+    const { rows } = await pool.query('SELECT * FROM campeonatos WHERE id_campeonato=$1 AND eliminado_at IS NULL', [validate.id(req.params.id)]);
     if (!rows[0]) throw httpError(404, 'El campeonato no existe.'); res.json(rows[0]);
   }));
   app.post('/api/campeonatos', allow('campeonatos:crear'), route(async (req, res) => {
@@ -159,9 +172,13 @@ function createApp(pool) {
   app.put('/api/campeonatos/:id', allow('campeonatos:editar'), route(async (req, res) => {
     const id = validate.id(req.params.id);
     const campeonato = await write(req, 'campeonatos:editar', async client => {
-      const { rows } = await client.query('SELECT * FROM campeonatos WHERE id_campeonato=$1 FOR UPDATE', [id]);
+      const { rows } = await client.query('SELECT * FROM campeonatos WHERE id_campeonato=$1 AND eliminado_at IS NULL FOR UPDATE', [id]);
       if (!rows[0]) throw httpError(404, 'El campeonato no existe.');
       const data = validate.championship({ ...rows[0], ...req.body });
+      if ((await client.query('SELECT campeonato_id FROM fixture_campeonato WHERE campeonato_id=$1', [id])).rows[0]) {
+        const fixed = ['modalidad','categoria','cantidad_canchas','limite_equipos','duracion_partido_min','descanso_entre_partidos_min'];
+        if (fixed.some(key => data[key] !== rows[0][key]) || data.hora_inicio.slice(0,5) !== rows[0].hora_inicio.slice(0,5)) throw httpError(409, 'Las condiciones deportivas están fijadas porque el calendario automático ya comenzó. Puedes editar el nombre y el estado.');
+      }
       const updated = await updateChampionship(client, id, data);
       const cambios = Object.fromEntries(Object.keys(data).filter(key => data[key]!==rows[0][key]).map(key => [key, { antes: rows[0][key], despues: data[key] }]));
       await audit(client, req, 'campeonato_actualizado', { campeonato_id: id, campeonato_nombre: updated.nombre, cambios }); return updated;
@@ -171,13 +188,12 @@ function createApp(pool) {
   app.delete('/api/campeonatos/:id', allow('campeonatos:eliminar'), route(async (req, res) => {
     const id = validate.id(req.params.id);
     await write(req, 'campeonatos:eliminar', async client => {
-      const { rows } = await client.query('SELECT id_campeonato FROM campeonatos WHERE id_campeonato=$1 FOR UPDATE', [id]);
+      const { rows } = await client.query('SELECT id_campeonato FROM campeonatos WHERE id_campeonato=$1 AND eliminado_at IS NULL FOR UPDATE', [id]);
       if (!rows[0]) throw httpError(404, 'El campeonato no existe.');
-      const linked = await client.query(`SELECT EXISTS(SELECT 1 FROM equipos WHERE campeonato_id=$1 UNION ALL SELECT 1 FROM partidos WHERE campeonato_id=$1 UNION ALL SELECT 1 FROM tabla_posiciones WHERE campeonato_id=$1 UNION ALL SELECT 1 FROM tarifas_campeonato WHERE campeonato_id=$1 UNION ALL SELECT 1 FROM transacciones_financieras WHERE campeonato_id=$1 UNION ALL SELECT 1 FROM turnos_campeonato WHERE campeonato_id=$1) AS found`, [id]);
-      if (linked.rows[0].found) throw httpError(409, 'Este campeonato tiene registros asociados. Desactívalo para conservar su historial.');
-      await client.query('DELETE FROM campeonatos WHERE id_campeonato=$1', [id]); await audit(client, req, 'campeonato_eliminado', { campeonato_id: id });
+      const counts = await deleteChampionship(client, id);
+      await audit(client, req, 'campeonato_eliminado', { campeonato_id: id, ...counts });
     });
-    res.json({ message: 'Campeonato eliminado' });
+    res.json({ message: 'Campeonato eliminado definitivamente junto con sus equipos, jugadores y partidos.' });
   }));
 
   app.get('/api/solicitudes-campeonato', route(async (req, res) => {
@@ -228,7 +244,18 @@ function createApp(pool) {
   app.use('/api', (req, res) => res.status(404).json({ error: 'Esta función todavía no está disponible.' }));
   app.use((error, req, res, next) => {
     if (res.headersSent) return next(error);
-    if (error.code==='23505') return res.status(409).json({ error: error.constraint==='solicitudes_campeonato_pendiente_idx' ? 'Ya tienes una solicitud pendiente. Espera la respuesta del administrador.' : 'Ya existe un usuario con ese correo electrónico.' });
+    if (error.code==='23505') {
+      const conflicts = {
+        solicitudes_campeonato_pendiente_idx: 'Ya tienes una solicitud pendiente. Espera la respuesta del administrador.',
+        equipos_campeonato_nombre_ci_idx: 'Ya existe un equipo con ese nombre en el campeonato.',
+        jugadores_dni_key: 'Ya existe un jugador con ese CI.',
+        jugadores_ci_key: 'Ya existe un jugador con ese CI.',
+        jugadores_ci_normalizado_idx: 'Ya existe un jugador con ese CI.',
+        jugadores_equipo_dorsal_idx: 'Ese dorsal ya está asignado a otro jugador del equipo.',
+      };
+      return res.status(409).json({ error: conflicts[error.constraint] || 'Ya existe un usuario con ese correo electrónico.' });
+    }
+    if (error.type==='entity.too.large') return res.status(413).json({ error: 'Los datos enviados superan el tamaño permitido.' });
     if (error.type==='entity.parse.failed') return res.status(400).json({ error: 'Los datos enviados no tienen un formato válido.' });
     if (error.status && error.status<500) return res.status(error.status).json({ error: error.message });
     console.error('Error de API:', error.code || error.name);
